@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/Jeffman112/SDXL-Fast/assets/123284838/20e2397a-c464-478e-a699-8271681067ba" width="300" height="300" alt="Generated Image">
+  <img src="https://github.com/Tolerable/SDXL-Fast_UI/blob/main/output_20231107-144208.jpg" width="400" height="400" alt="Generated Image">
 </p>
 
 # SDXL-Fast_UI: Accelerated Text-to-Image Generation with SDXL
