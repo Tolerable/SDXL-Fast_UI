@@ -51,22 +51,20 @@ def redo_image_generation():
     # Call handle_user_input for redo operation
     handle_user_input(new_generation=False)
 
-
-
-def handle_user_input(new_generation=True):
+def handle_user_input(event=None, new_generation=True):
     global last_prompt, last_ar, last_steps, last_upscale, last_seed, image_generated, last_generated_image_path
 
     # Use the current GUI inputs or the last saved parameters
-    prompt = prompt_entry.get("1.0", "end-1c") if new_generation or last_prompt is None else last_prompt
-    ar = aspect_ratio_var.get() or '1'  # Always use the current aspect ratio from GUI
-    upscale = upscale_var.get() == 'y'  # Always use the current upscale setting from GUI
+    prompt = prompt_entry.get("1.0", "end-1c") if new_generation else last_prompt
+    ar = aspect_ratio_var.get() if aspect_ratio_var.get() else '1'  # Default aspect ratio
+    upscale = upscale_var.get() == 'y'
     steps_input = steps_var.get()
-    steps = int(steps_input) if steps_input.isdigit() else 20 if new_generation or last_steps is None else last_steps
+    steps = int(steps_input) if steps_input.isdigit() else 20
     seed_input = seed_var.get()
-    seed = int(seed_input) if seed_input.isdigit() else random.randint(0, 999999999999) if new_generation or last_seed is None else last_seed
+    seed = int(seed_input) if seed_input.isdigit() else random.randint(0, 999999999999)
 
-    # Aspect ratio and size calculations based on the current GUI setting
-    base_width, base_height = 512, 512  # Default: Square
+    # Aspect ratio and size calculations
+    base_width, base_height = 512, 512  # Default size
     if ar == '2':
         base_width, base_height = 672, 384  # Widescreen
     elif ar == '3':
@@ -74,7 +72,6 @@ def handle_user_input(new_generation=True):
     elif ar == '4':
         base_width, base_height = 768, 320  # Ultra Widescreen
 
-    # Determine the final width and height, considering whether upscaling is enabled
     width, height = (base_width * 2, base_height * 2) if upscale else (base_width, base_height)
 
     # Generate the image
@@ -94,10 +91,8 @@ def handle_user_input(new_generation=True):
     # Update the displayed image
     update_image(filename, upscale)
 
-    # Update global variables, including the seed
-    if new_generation:
-        # Update the last used parameters only if it's a new generation
-        last_prompt, last_ar, last_steps, last_upscale, last_seed = prompt, ar, steps, upscale, seed
+    # Update global variables
+    last_prompt, last_ar, last_steps, last_upscale, last_seed = prompt, ar, steps, upscale, seed
     last_generated_image_path = filename
     image_generated = True
 
@@ -106,6 +101,12 @@ def handle_user_input(new_generation=True):
         prompt_entry.delete("1.0", "end")
         seed_entry.delete(0, tk.END)
 
+    # Prevent the event from propagating further
+    return "break"
+
+def on_enter_key(event):
+    handle_user_input()
+    return "break"  # Prevents the default behavior of adding a newline
 
 
 def copy_image_to_clipboard():
@@ -135,7 +136,9 @@ if os.path.exists(default_image_path):
 else:
     first_image_displayed = False
 
+
 # User input fields and buttons
+
 
 # Prompt Input Frame
 prompt_frame = tk.Frame(root)
@@ -146,6 +149,7 @@ prompt_label.pack(side=tk.LEFT, padx=5)
 
 prompt_entry = tk.Text(prompt_frame, height=3, width=60)  # Changed to Text widget for multiline input, width adjusted
 prompt_entry.pack(side=tk.LEFT, expand=True, fill='x')
+prompt_entry.bind("<Return>", on_enter_key)
 
 # Seed Input Frame
 seed_frame = tk.Frame(root)
