@@ -1,0 +1,9 @@
+# Ignore files matching the pattern main-0001*.py
+main-0001*.py
+
+# Ignore specific file main-0001working-keep!.py
+main-0001working-keep!.py
+!main.py
+
+# Ignore the OUTPUT folder and its contents
+OUTPUT/
