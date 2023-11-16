@@ -2,11 +2,11 @@
   <img src="https://github.com/Jeffman112/SDXL-Fast/assets/123284838/20e2397a-c464-478e-a699-8271681067ba" width="300" height="300" alt="Generated Image">
 </p>
 
-# SDXL-Fast: Accelerated Text-to-Image Generation with SDXL
+# SDXL-Fast_UI: Accelerated Text-to-Image Generation with SDXL
 
 ## Overview
 
-SDXL-Fast is a Python script that utilizes the `StableDiffusionXLPipeline` for high-speed text-to-image generation. With astonishingly fast image generation times (around 15 seconds on my benchmark GPU, RTX 3060 Ti, and faster on higher end GPUs), you can transform text prompts into high-quality 1024x1024 images in seconds!
+SDXL-Fast_UI enhances the original SDXL-Fast script, offering a user-friendly interface and additional features for the StableDiffusionXLPipeline. This Python script accelerates text-to-image generation, producing high-quality 1024x1024 images in mere seconds. Optimized for speed, it can generate images in about 15 seconds on an RTX 3060 Ti, with even faster results on higher-end GPUs.
 
 ---
 
@@ -25,6 +25,14 @@ cd SDXL-Fast
 pip install -r requirements.txt
 ```
 
+## Enhanced Features
+
+Interactive GUI: Provides a Tkinter-based graphical user interface for easier interaction.
+Aspect Ratio Selection: Users can choose from various aspect ratios (Square, Widescreen, Tall, Ultra Widescreen) for image generation.
+Upscaling Option: Allows for generating higher resolution images.
+Clipboard Integration: Enables copying of generated images directly to the clipboard.
+Multiline Prompt Input: Supports multiline text input for more detailed prompts.
+
 ## Usage
 Once you've completed the setup, you can start generating images from text prompts using SDXL-Fast. Here's how:
 
@@ -32,7 +40,11 @@ Run the script using the following command:
 ```bash
 python main.py
 ```
-Follow the on-screen instructions. The script will prompt you to enter a text prompt as well as a number to select aspect ratio
+Enter a text prompt and select aspect ratio using the GUI.
+
+An image based on your prompt will be generated and displayed.
+
+You can copy the generated image to the clipboard for easy sharing.
 
 After providing the prompt, an image will be generated.
 
