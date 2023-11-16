@@ -39,20 +39,33 @@ def update_image(filename, is_upscaled, is_default_image=False):
     label.configure(image=img)
     label.image = img
 
-def generate_image(prompt, width, height, steps):
-    response = pipe(prompt=prompt, width=width, height=height, num_inference_steps=steps)
+def generate_image(prompt, width, height, steps, seed=None):
+    if seed is not None:
+        response = pipe(prompt=prompt, width=width, height=height, num_inference_steps=steps, generator=torch.Generator("cuda").manual_seed(seed))
+    else:
+        response = pipe(prompt=prompt, width=width, height=height, num_inference_steps=steps)
     image = response.images[0]
     return image
 
-def handle_user_input():
-    global last_prompt, last_ar, last_steps, last_upscale, image_generated, last_generated_image_path
-    prompt = prompt_entry.get("1.0", "end-1c")  # Retrieve the text from the prompt input
-    ar = aspect_ratio_var.get() or '1'  # Get the aspect ratio
-    upscale = upscale_var.get() == 'y'  # Determine if upscaling is selected
-    steps_input = steps_var.get()  # Get the number of steps from the input
-    steps = int(steps_input) if steps_input.isdigit() else 20  # Convert steps to an integer, default to 20 if not specified
+def redo_image_generation():
+    # Call handle_user_input for redo operation
+    handle_user_input(new_generation=False)
 
-    # Set the base width and height based on the aspect ratio
+
+
+def handle_user_input(new_generation=True):
+    global last_prompt, last_ar, last_steps, last_upscale, last_seed, image_generated, last_generated_image_path
+
+    # Use the current GUI inputs or the last saved parameters
+    prompt = prompt_entry.get("1.0", "end-1c") if new_generation or last_prompt is None else last_prompt
+    ar = aspect_ratio_var.get() or '1'  # Always use the current aspect ratio from GUI
+    upscale = upscale_var.get() == 'y'  # Always use the current upscale setting from GUI
+    steps_input = steps_var.get()
+    steps = int(steps_input) if steps_input.isdigit() else 20 if new_generation or last_steps is None else last_steps
+    seed_input = seed_var.get()
+    seed = int(seed_input) if seed_input.isdigit() else random.randint(0, 999999999999) if new_generation or last_seed is None else last_seed
+
+    # Aspect ratio and size calculations based on the current GUI setting
     base_width, base_height = 512, 512  # Default: Square
     if ar == '2':
         base_width, base_height = 672, 384  # Widescreen
@@ -65,7 +78,7 @@ def handle_user_input():
     width, height = (base_width * 2, base_height * 2) if upscale else (base_width, base_height)
 
     # Generate the image
-    image = generate_image(prompt, width, height, steps)
+    image = generate_image(prompt, width, height, steps, seed)
 
     # Create a filename for the generated image
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -81,13 +94,18 @@ def handle_user_input():
     # Update the displayed image
     update_image(filename, upscale)
 
-    # Update global variables
-    last_prompt, last_ar, last_steps, last_upscale = prompt, ar, steps, upscale
+    # Update global variables, including the seed
+    if new_generation:
+        # Update the last used parameters only if it's a new generation
+        last_prompt, last_ar, last_steps, last_upscale, last_seed = prompt, ar, steps, upscale, seed
     last_generated_image_path = filename
     image_generated = True
 
-    # Clear the prompt after generating the image
-    prompt_entry.delete("1.0", "end")
+    if new_generation:
+        # Clear the prompt and seed fields after generating a new image
+        prompt_entry.delete("1.0", "end")
+        seed_entry.delete(0, tk.END)
+
 
 
 def copy_image_to_clipboard():
@@ -129,6 +147,17 @@ prompt_label.pack(side=tk.LEFT, padx=5)
 prompt_entry = tk.Text(prompt_frame, height=3, width=60)  # Changed to Text widget for multiline input, width adjusted
 prompt_entry.pack(side=tk.LEFT, expand=True, fill='x')
 
+# Seed Input Frame
+seed_frame = tk.Frame(root)
+seed_frame.pack(fill='x')
+
+seed_label = tk.Label(seed_frame, text="Seed (optional):")
+seed_label.pack(side=tk.LEFT)
+
+seed_var = tk.StringVar()
+seed_entry = tk.Entry(seed_frame, textvariable=seed_var, width=10)
+seed_entry.pack(side=tk.LEFT)
+
 # Number of Steps Frame
 steps_frame = tk.Frame(root)
 steps_frame.pack(fill='x')
@@ -152,26 +181,36 @@ aspect_ratio_var = tk.StringVar(value='1')
 for text, value in aspect_ratios.items():
     tk.Radiobutton(aspect_ratio_frame, text=text, variable=aspect_ratio_var, value=value).pack(side=tk.LEFT)
 
-# Upscale Option Frame
+# Resolution (2x) Option Frame
 upscale_frame = tk.Frame(root)
 upscale_frame.pack(fill='x')
 
-upscale_label = tk.Label(upscale_frame, text="Upscale?")
+# Generates a new image at double the base resolution, providing more detail.
+# Note: This creates a new interpretation of the prompt, not a direct enlargement of an existing image.
+upscale_label = tk.Label(upscale_frame, text="Resolution (2x)")
 upscale_label.pack(side=tk.LEFT)
 
+# Radio Buttons for Resolution (2x)
 upscale_var = tk.StringVar(value='n')
 tk.Radiobutton(upscale_frame, text="Yes", variable=upscale_var, value='y').pack(side=tk.LEFT)
 tk.Radiobutton(upscale_frame, text="No", variable=upscale_var, value='n').pack(side=tk.LEFT)
 
+# Label After Radio Buttons
+upscale_info_label = tk.Label(upscale_frame, text="(Changes Seed Results)")
+upscale_info_label.pack(side=tk.LEFT)
+
 # Button Frame
 button_frame = tk.Frame(root)
-button_frame.pack()
+button_frame.pack(padx=5, pady=5)  # Add padding around the entire frame
 
 generate_button = tk.Button(button_frame, text="Generate Image", command=handle_user_input)
-generate_button.pack(side=tk.LEFT, padx=5)
+generate_button.pack(side=tk.LEFT, padx=5, pady=5)
 
 copy_button = tk.Button(button_frame, text="Copy Image", command=copy_image_to_clipboard)
-copy_button.pack(side=tk.LEFT, padx=5)
+copy_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+redo_button = tk.Button(button_frame, text="Redo Image", command=redo_image_generation)
+redo_button.pack(side=tk.LEFT, padx=5, pady=5)
 
 # Right-click context menu
 right_click_menu = tk.Menu(root, tearoff=0)
