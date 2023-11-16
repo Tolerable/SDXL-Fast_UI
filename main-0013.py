@@ -26,21 +26,17 @@ def update_image(filename, is_upscaled, is_default_image=False):
     label.configure(image=img)
     label.image = img
 
-def generate_image(prompt, width, height, steps, seed=None, use_refiner=False):
+def generate_image(prompt, width, height, steps, seed=None):
     if seed is not None:
-        # If a seed is provided, use it to ensure reproducible results
-        response = pipe(prompt=prompt, width=width, height=height, num_inference_steps=steps, generator=torch.Generator("cuda").manual_seed(seed), use_refiner=use_refiner)
+        response = pipe(prompt=prompt, width=width, height=height, num_inference_steps=steps, generator=torch.Generator("cuda").manual_seed(seed))
     else:
-        # If no seed is provided, generate image without a specific seed (results will be different each time)
-        response = pipe(prompt=prompt, width=width, height=height, num_inference_steps=steps, use_refiner=use_refiner)
+        response = pipe(prompt=prompt, width=width, height=height, num_inference_steps=steps)
     image = response.images[0]
     return image
 
-
 def handle_user_input(event=None, new_generation=True):
-    global last_prompt, last_ar, last_steps, last_upscale, last_seed, last_refiner, image_generated, last_generated_image_path, seed_entry, refiner_var
-    # Extract the value of refiner_var
-    use_refiner = refiner_var.get() == 'y'    
+    global last_prompt, last_ar, last_steps, last_upscale, last_seed, image_generated, last_generated_image_path, seed_entry
+
     prompt = prompt_entry.get("1.0", "end-1c") if new_generation or last_prompt is None else last_prompt
     ar = aspect_ratio_var.get() or '1' 
     upscale = upscale_var.get() == 'y'
@@ -58,7 +54,7 @@ def handle_user_input(event=None, new_generation=True):
         base_width, base_height = 768, 320
 
     width, height = (base_width * 2, base_height * 2) if upscale else (base_width, base_height)
-    image = generate_image(prompt, width, height, steps, seed, use_refiner)
+    image = generate_image(prompt, width, height, steps, seed)
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     filename = os.path.join(output_folder, f"output_{timestamp}.jpg")
 
@@ -70,8 +66,6 @@ def handle_user_input(event=None, new_generation=True):
 
     update_image(filename, upscale)
     if new_generation:
-        # Save the refiner state along with other parameters
-        last_refiner = use_refiner
         last_prompt, last_ar, last_steps, last_upscale, last_seed = prompt, ar, steps, upscale, seed
     last_generated_image_path = filename
     image_generated = True
@@ -142,44 +136,30 @@ def run_tkinter():
     prompt_frame = tk.Frame(root)
     prompt_frame.pack(fill='x', padx=5, pady=5)
 
-    prompt_label = tk.Label(prompt_frame, text="P\nR\nO\nM\nP\nT")
+    prompt_label = tk.Label(prompt_frame, text="Prompt:\n")
     prompt_label.pack(side=tk.LEFT, padx=5)
 
-    prompt_entry = tk.Text(prompt_frame, height=4, width=30)
-    prompt_entry.pack(side=tk.LEFT, expand=True, fill='x', padx=(0,10), pady=5)
+    prompt_entry = tk.Text(prompt_frame, height=3, width=55)
+    prompt_entry.pack(side=tk.LEFT, expand=True, fill='x')
     prompt_entry.bind("<Return>", on_enter_key)  # Binding the Enter key to the on_enter_key function
 
-    # Frame containing both Seed and Refiner Options
-    seed_refiner_frame = tk.Frame(root)
-    seed_refiner_frame.pack(fill='x', padx=(5,5), pady=5)
-
+    
     # Seed Input Frame
-    seed_frame = tk.Frame(seed_refiner_frame)
-    seed_frame.pack(side=tk.LEFT, padx=(10,10), pady=5)
+    seed_frame = tk.Frame(root)
+    seed_frame.pack(fill='x')
 
-    seed_label = tk.Label(seed_frame, text="Seed:")
+    seed_label = tk.Label(seed_frame, text="Seed (optional):")
     seed_label.pack(side=tk.LEFT)
 
     seed_var = tk.StringVar()
     seed_entry = tk.Entry(seed_frame, textvariable=seed_var, width=10)
     seed_entry.pack(side=tk.LEFT)
 
-    # Refiner Option Frame
-    refiner_frame = tk.Frame(seed_refiner_frame)
-    refiner_frame.pack(side=tk.LEFT, padx=(30,10), pady=5)
+    # Number of Steps Frame
+    steps_frame = tk.Frame(root)
+    steps_frame.pack(fill='x')
 
-    refiner_label = tk.Label(refiner_frame, text="Refiner:")
-    refiner_label.pack(side=tk.LEFT)
-
-    refiner_var = tk.StringVar(value='n')  # Default to 'No'
-    tk.Radiobutton(refiner_frame, text="Yes", variable=refiner_var, value='y').pack(side=tk.LEFT)
-    tk.Radiobutton(refiner_frame, text="No", variable=refiner_var, value='n').pack(side=tk.LEFT)
-
-    # Steps Frame
-    steps_frame = tk.Frame(seed_refiner_frame)
-    steps_frame.pack(side=tk.LEFT, padx=(35,10))
-
-    steps_label = tk.Label(steps_frame, text="Steps (default: 20):")
+    steps_label = tk.Label(steps_frame, text="Number of Steps (default: 20):")
     steps_label.pack(side=tk.LEFT)
 
     steps_var = tk.StringVar()
@@ -188,7 +168,7 @@ def run_tkinter():
 
     # Aspect Ratio Frame
     aspect_ratio_frame = tk.Frame(root)
-    aspect_ratio_frame.pack(fill='x', padx=(70,10))
+    aspect_ratio_frame.pack(fill='x')
 
     aspect_ratio_label = tk.Label(aspect_ratio_frame, text="Aspect Ratio:")
     aspect_ratio_label.pack(side=tk.LEFT)
@@ -200,7 +180,7 @@ def run_tkinter():
 
     # Resolution (2x) Option Frame
     upscale_frame = tk.Frame(root)
-    upscale_frame.pack(fill='x', padx=(70,10))
+    upscale_frame.pack(fill='x')
 
     # Generates a new image at double the base resolution, providing more detail.
     # Note: This creates a new interpretation of the prompt, not a direct enlargement of an existing image.
