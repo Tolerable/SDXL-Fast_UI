@@ -13,6 +13,14 @@ import tempfile
 import subprocess
 import win32clipboard
 
+# Global variable declarations
+img, label = None, None
+refiner_var = None  # Initialize as None
+last_prompt, last_ar, last_steps, last_upscale, last_seed, last_refiner = None, None, None, None, None, None
+image_generated, last_generated_image_path = False, None
+seed_entry, prompt_entry, aspect_ratio_var, upscale_var, steps_var, seed_var = None, None, None, None, None, None
+root, output_folder = None, None
+
 # Initialize the Stable Diffusion pipeline
 pipe = StableDiffusionXLPipeline.from_pretrained("segmind/SSD-1B", torch_dtype=torch.float16, use_safetensors=True, variant="fp16")
 pipe.to("cuda")
@@ -28,26 +36,36 @@ def update_image(filename, is_upscaled, is_default_image=False):
 
 def generate_image(prompt, width, height, steps, seed=None, use_refiner=False):
     if seed is not None:
-        # If a seed is provided, use it to ensure reproducible results
         response = pipe(prompt=prompt, width=width, height=height, num_inference_steps=steps, generator=torch.Generator("cuda").manual_seed(seed), use_refiner=use_refiner)
     else:
-        # If no seed is provided, generate image without a specific seed (results will be different each time)
         response = pipe(prompt=prompt, width=width, height=height, num_inference_steps=steps, use_refiner=use_refiner)
     image = response.images[0]
     return image
 
-
 def handle_user_input(event=None, new_generation=True):
-    global last_prompt, last_ar, last_steps, last_upscale, last_seed, last_refiner, image_generated, last_generated_image_path, seed_entry, refiner_var
-    # Extract the value of refiner_var
-    use_refiner = refiner_var.get() == 'y'    
+    global last_prompt, last_ar, last_steps, last_upscale, last_seed, last_refiner, image_generated, last_generated_image_path
+    
+    # Get the prompt text and strip leading/trailing whitespace
+    prompt = prompt_entry.get("1.0", "end-1c").strip()
+
+    # Check if the prompt is empty
+    if not prompt:
+        return  # Do nothing if the prompt is empty or only contains whitespace
+        
+    # Check if refiner_var is initialized
+    if refiner_var is None:
+        return  # Exit the function if refiner_var is not yet available
+
+    use_refiner = refiner_var.get() == 'y'
+    
     prompt = prompt_entry.get("1.0", "end-1c") if new_generation or last_prompt is None else last_prompt
-    ar = aspect_ratio_var.get() or '1' 
+    ar = aspect_ratio_var.get() or '1'
     upscale = upscale_var.get() == 'y'
     steps_input = steps_var.get()
     steps = int(steps_input) if steps_input.isdigit() else 20 if new_generation or last_steps is None else last_steps
     seed_input = seed_var.get()
     seed = int(seed_input) if seed_input.isdigit() else random.randint(0, 999999999999) if new_generation or last_seed is None else last_seed
+
 
     base_width, base_height = 512, 512  
     if ar == '2':
@@ -70,17 +88,13 @@ def handle_user_input(event=None, new_generation=True):
 
     update_image(filename, upscale)
     if new_generation:
-        # Save the refiner state along with other parameters
-        last_refiner = use_refiner
         last_prompt, last_ar, last_steps, last_upscale, last_seed = prompt, ar, steps, upscale, seed
     last_generated_image_path = filename
     image_generated = True
 
     if new_generation:
         prompt_entry.delete("1.0", "end")
-
-        # Check if seed_entry is defined before trying to delete its contents
-        if 'seed_entry' in globals():
+        if seed_entry is not None:
             seed_entry.delete(0, tk.END)
 
 def copy_image_to_clipboard():
@@ -108,13 +122,13 @@ def on_enter_key(event):
     handle_user_input()
     # Prevent the default behavior of the Enter key
     return "break"
-    # Assuming prompt_entry is your text input widget
+	
     prompt_entry.bind("<Return>", on_enter_key)
 
-
 def run_tkinter():
-    global root, prompt_entry, aspect_ratio_var, upscale_var, steps_var, seed_var, output_folder, label, last_prompt, last_ar, last_steps, last_upscale, last_seed, image_generated, last_generated_image_path, is_initialized
+    global root, prompt_entry, aspect_ratio_var, upscale_var, steps_var, seed_var, refiner_var, output_folder, label, last_prompt, last_ar, last_steps, last_upscale, last_seed, image_generated, last_generated_image_path
     root = tk.Tk()
+    refiner_var = tk.StringVar(value='n')  # Now correctly initialize refiner_var as a global variable
     root.title("Image Viewer")
 
     output_folder = './OUTPUT'
@@ -146,49 +160,45 @@ def run_tkinter():
     prompt_label.pack(side=tk.LEFT, padx=5)
 
     prompt_entry = tk.Text(prompt_frame, height=4, width=30)
-    prompt_entry.pack(side=tk.LEFT, expand=True, fill='x', padx=(0,10), pady=5)
-    prompt_entry.bind("<Return>", on_enter_key)  # Binding the Enter key to the on_enter_key function
+    prompt_entry.pack(side=tk.LEFT, expand=True, fill='x', padx=(0, 10), pady=5)
+    prompt_entry.bind("<Return>", on_enter_key)
 
-    # Frame containing both Seed and Refiner Options
+    # Frame containing Seed, Refiner, and Steps Options
     seed_refiner_frame = tk.Frame(root)
-    seed_refiner_frame.pack(fill='x', padx=(5,5), pady=5)
+    seed_refiner_frame.pack(fill='x', padx=(5, 5), pady=5)
 
-    # Seed Input Frame
+     # Seed Input Frame
     seed_frame = tk.Frame(seed_refiner_frame)
-    seed_frame.pack(side=tk.LEFT, padx=(10,10), pady=5)
-
+    seed_frame.pack(side=tk.LEFT, padx=(10, 10), pady=5)
     seed_label = tk.Label(seed_frame, text="Seed:")
     seed_label.pack(side=tk.LEFT)
-
     seed_var = tk.StringVar()
     seed_entry = tk.Entry(seed_frame, textvariable=seed_var, width=10)
     seed_entry.pack(side=tk.LEFT)
+    seed_entry.bind("<Return>", on_enter_key)  # Bind Enter key
 
     # Refiner Option Frame
     refiner_frame = tk.Frame(seed_refiner_frame)
-    refiner_frame.pack(side=tk.LEFT, padx=(30,10), pady=5)
-
+    refiner_frame.pack(side=tk.LEFT, padx=(30, 10), pady=5)
     refiner_label = tk.Label(refiner_frame, text="Refiner:")
     refiner_label.pack(side=tk.LEFT)
-
-    refiner_var = tk.StringVar(value='n')  # Default to 'No'
     tk.Radiobutton(refiner_frame, text="Yes", variable=refiner_var, value='y').pack(side=tk.LEFT)
     tk.Radiobutton(refiner_frame, text="No", variable=refiner_var, value='n').pack(side=tk.LEFT)
 
     # Steps Frame
     steps_frame = tk.Frame(seed_refiner_frame)
-    steps_frame.pack(side=tk.LEFT, padx=(35,10))
-
+    steps_frame.pack(side=tk.LEFT, padx=(35, 10))
     steps_label = tk.Label(steps_frame, text="Steps (default: 20):")
     steps_label.pack(side=tk.LEFT)
-
     steps_var = tk.StringVar()
     steps_entry = tk.Entry(steps_frame, textvariable=steps_var, width=4)
     steps_entry.pack(side=tk.LEFT)
+    steps_entry.bind("<Return>", on_enter_key)  # Bind Enter key
+
 
     # Aspect Ratio Frame
     aspect_ratio_frame = tk.Frame(root)
-    aspect_ratio_frame.pack(fill='x', padx=(70,10))
+    aspect_ratio_frame.pack(fill='x', padx=(70, 10))
 
     aspect_ratio_label = tk.Label(aspect_ratio_frame, text="Aspect Ratio:")
     aspect_ratio_label.pack(side=tk.LEFT)
@@ -200,26 +210,21 @@ def run_tkinter():
 
     # Resolution (2x) Option Frame
     upscale_frame = tk.Frame(root)
-    upscale_frame.pack(fill='x', padx=(70,10))
+    upscale_frame.pack(fill='x', padx=(70, 10))
 
-    # Generates a new image at double the base resolution, providing more detail.
-    # Note: This creates a new interpretation of the prompt, not a direct enlargement of an existing image.
     upscale_label = tk.Label(upscale_frame, text="Resolution (2x)")
     upscale_label.pack(side=tk.LEFT)
 
-    # Radio Buttons for Resolution (2x)
     upscale_var = tk.StringVar(value='n')
     tk.Radiobutton(upscale_frame, text="Yes", variable=upscale_var, value='y').pack(side=tk.LEFT)
     tk.Radiobutton(upscale_frame, text="No", variable=upscale_var, value='n').pack(side=tk.LEFT)
 
-    # Label After Radio Buttons
     upscale_info_label = tk.Label(upscale_frame, text="(Changes Seed Results)")
     upscale_info_label.pack(side=tk.LEFT)
 
-
     # Button Frame
     button_frame = tk.Frame(root)
-    button_frame.pack(padx=5, pady=5)  # Add padding around the entire frame
+    button_frame.pack(padx=5, pady=5)
 
     generate_button = tk.Button(button_frame, text="Generate Image", command=handle_user_input)
     generate_button.pack(side=tk.LEFT, padx=5, pady=5)
@@ -236,8 +241,7 @@ def run_tkinter():
 
     label.bind("<Button-3>", lambda event: right_click_menu.post(event.x_root, event.y_root))
 
-    root.mainloop()  # Start the Tkinter main loop
-    
+    root.mainloop()
+
 if __name__ == "__main__":
     run_tkinter()
-
